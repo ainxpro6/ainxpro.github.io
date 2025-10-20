@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload File PL</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container mt-4" style="max-width: 600px;">
+        <div class="card shadow-lg"> <div class="card-body p-5"> <h1 class="text-center mb-4 text-primary">
+                    <i class="bi bi-file-earmark-arrow-up-fill me-2"></i>
+                    Upload Picking List
+                </h1>
+
+                <div id="alert-container" class="mb-3"></div> <form method="POST" enctype="multipart/form-data" id="upload-form">
+                    <div class="mb-4">
+                        <div class="drop-zone" id="drop-zone">
+                            <div class="drop-zone-content">
+                                <i class="bi bi-cloud-arrow-up-fill"></i>
+                                <div class="drop-zone-text fs-6 mt-3">Seret file ke sini atau klik untuk upload</div>
+                                <div class="text-muted mt-2">Format: .xls, .xlsx, .pdf</div>
+                            </div>
+                            <input type="file" name="file" class="form-control d-none" required accept=".pdf, .xlsx, .xls" id="file-input">
+                        </div>
+                        
+                        <div id="file-preview" class="d-flex align-items-center justify-content-center mt-3 d-none">
+                            <i id="file-icon" class="bi fs-2 me-2"></i>
+                            <span id="file-name" class="fw-medium"></span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-3 fw-bold" id="submit-button">
+                        <span class="btn-text">
+                            <i class="bi bi-gear-fill me-2"></i>Proses File
+                        </span>
+                        <div class="spinner"></div>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="text-center mt-4 pt-3 powered-by"> Powered by <strong class="text-primary">Davit Maulana</strong> | &copy; 2025
+			<br/>
+			Versi 2.1
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const fileInput = document.getElementById("file-input");
+            const dropZone = document.getElementById("drop-zone");
+            const uploadForm = document.getElementById("upload-form");
+            const submitButton = document.getElementById("submit-button");
+            const alertContainer = document.getElementById("alert-container");
+
+            function showAlert(message, category = 'danger') {
+                alertContainer.innerHTML = '';
+                
+                const wrapper = document.createElement('div');
+                wrapper.innerHTML = [
+                    `<div class="alert alert-${category} alert-dismissible fade show" role="alert">`,
+                    `   <div>${message}</div>`,
+                    '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+                    '</div>'
+                ].join('');
+
+                alertContainer.append(wrapper);
+                
+                if (category === 'success') {
+                    const alertElement = wrapper.firstChild;
+                    setTimeout(() => {
+                        const bsAlert = bootstrap.Alert.getOrCreateInstance(alertElement);
+                        if (bsAlert) {
+                            bsAlert.close();
+                        }
+                    }, 5000);
+                }
+            }
+
+            dropZone.addEventListener("click", () => fileInput.click());
+            dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    fileInput.dispatchEvent(new Event('change'));
+                }
+            });
+
+            fileInput.addEventListener("change", () => {
+                const preview = document.getElementById('file-preview');
+                const icon = document.getElementById('file-icon');
+                const nameDisplay = document.getElementById('file-name');
+                alertContainer.innerHTML = '';
+
+                preview.classList.add('d-none');
+                icon.className = 'bi fs-2 me-2';
+                submitButton.disabled = false;
+
+                if (fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    nameDisplay.textContent = file.name;
+                    preview.classList.remove('d-none');
+                    
+                    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+                    const isExcel = file.name.toLowerCase().endsWith('.xls') || file.name.toLowerCase().endsWith('.xlsx');
+
+                    if (isPdf) {
+                        icon.classList.add('bi-file-earmark-pdf-fill', 'text-danger');
+                    } else if (isExcel) {
+                        icon.classList.add('bi-file-earmark-excel-fill', 'text-success');
+                    } else {
+                        icon.classList.add('bi-x-circle-fill', 'text-warning');
+                        nameDisplay.textContent += ' - Format tidak valid!';
+                        submitButton.disabled = true;
+                    }
+                }
+            });
+
+            uploadForm.addEventListener("submit", async function(e) {
+                e.preventDefault(); 
+                if (fileInput.files.length === 0) { showAlert("⚠️ Pilih file terlebih dahulu!", "warning"); return; }
+                submitButton.classList.add("processing");
+                submitButton.disabled = true;
+                
+                const formData = new FormData(uploadForm);
+                try {
+                    const response = await fetch("/", { method: "POST", body: formData });
+                    if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || 'Terjadi kesalahan pada server.'); }
+                    
+                    const disposition = response.headers.get('Content-Disposition');
+                    let filename = "processed_file.xlsx";
+                    if (disposition) {
+                        let filenameMatch = disposition.match(/filename="([^"]+)"/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1];
+                        } else {
+                            filenameMatch = disposition.match(/filename=([^;]+)/);
+                            if (filenameMatch && filenameMatch[1]) { filename = filenameMatch[1]; }
+                        }
+                    }
+                    
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.style.display = "none"; a.href = url; a.download = filename;
+                    document.body.appendChild(a); a.click();
+                    window.URL.revokeObjectURL(url); document.body.removeChild(a);
+
+                    showAlert("✔️ Berhasil! Unduhan Anda telah dimulai.", "success");
+
+                } catch (error) {
+                    showAlert(`❌ ${error.message}`);
+                } finally {
+                    setTimeout(() => {
+                        submitButton.classList.remove("processing");
+                        submitButton.disabled = false;
+                        fileInput.value = ""; 
+                        document.getElementById('file-preview').classList.add('d-none');
+                        document.getElementById('file-name').textContent = "";
+                    }, 2000);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
